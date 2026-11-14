@@ -1558,8 +1558,22 @@
         }, 5000);
       }
 
+      // Intercepta os valores antigos e sempre abre o formulário PIX da SyncPay.
+      // Captura antes dos listeners antigos para impedir redirecionamentos ao AutoPix.
+      document.addEventListener('click', function (event) {
+        const link = event.target && event.target.closest
+          ? event.target.closest('a.donation-link')
+          : null;
+        if (!link) return;
+        const match = link.textContent.trim().match(/R\$\s*([\d.]+)(?:,([\d]{2}))?/);
+        if (!match) return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        const reais = Number(match[1].replace(/\./g, '')) + Number(match[2] || 0) / 100;
+        submitValue(Math.round(reais * 100), link);
+      }, true);
+
       async function submitValue(presetAmountCents, clickedBtn) {
-        if (!window.__checkoutUnlocked) return;
         let amountCents = presetAmountCents;
         if (!amountCents) {
           const field = document.getElementById('moneyInput') || document.getElementById('moneyInputOther');
@@ -1798,7 +1812,6 @@
         }
         const submitValueBtn = document.getElementById("submitValueBtn");
         if (submitValueBtn) submitValueBtn.addEventListener("click", () => {
-          if (!window.__checkoutUnlocked) return;
           const field = document.getElementById("moneyInputOther");
           const raw = field ? field.value.replace(/\D/g, "") : "";
           if (!raw) { showToast("Digite um valor para continuar."); return; }
