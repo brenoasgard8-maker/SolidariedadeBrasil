@@ -252,7 +252,16 @@
     #yaya-toast svg{flex-shrink:0}
     @keyframes pix-spin{to{transform:rotate(360deg)}}
   </style>
-  <link rel="preload" as="style" href="css/bootstrap.min.css"><link rel="preload" as="style" href="css/swiper-bundle.min.css"><script async="" src="js/fbevents.js"></script></head>
+  <link rel="preload" as="style" href="css/bootstrap.min.css"><link rel="preload" as="style" href="css/swiper-bundle.min.css"><script async="" src="js/fbevents.js"></script><style>
+/* Evita zoom automático do Safari/iPhone ao focar nos campos do formulário PIX */
+#donorPixForm input,
+#donorPixForm select,
+#donorPixForm textarea {
+  font-size: 16px !important;
+  line-height: 1.4;
+}
+</style>
+</head>
 
   <body>
     <script>
