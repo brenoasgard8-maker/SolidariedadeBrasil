@@ -1035,7 +1035,24 @@
 </div>
 
 
-<!-- MODAL PIX -->
+<!-- DADOS DO DOADOR -->
+    <div class="modal modal-doar" id="donorFormModal" style="display:none;">
+      <div class="modal-content">
+        <button class="close-modal" id="donorFormClose" aria-label="Fechar">×</button>
+        <h3 style="color:#1bcf66;font-size:1.1rem;font-weight:900;text-align:center;">Finalizar doação</h3>
+        <p style="text-align:center;color:#6b7280;">Valor: <strong id="donorAmount"></strong></p>
+        <form id="donorPixForm">
+          <label for="donorName">Nome completo</label><input id="donorName" type="text" autocomplete="name" required minlength="3" maxlength="100" placeholder="Seu nome completo" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:8px;margin:5px 0 10px;">
+          <label for="donorCpf">CPF</label><input id="donorCpf" type="text" inputmode="numeric" required maxlength="14" placeholder="000.000.000-00" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:8px;margin:5px 0 10px;">
+          <label for="donorEmail">E-mail</label><input id="donorEmail" type="email" autocomplete="email" required maxlength="150" placeholder="seuemail@exemplo.com" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:8px;margin:5px 0 10px;">
+          <label for="donorPhone">Celular com DDD</label><input id="donorPhone" type="tel" inputmode="tel" autocomplete="tel" required maxlength="16" placeholder="(11) 99999-9999" style="width:100%;padding:11px;border:1px solid #ddd;border-radius:8px;margin:5px 0 14px;">
+          <button class="pix-copy-btn" id="donorPixSubmit" type="submit">GERAR PIX</button>
+          <p id="donorPixError" class="pix-error" style="display:none;"></p>
+        </form>
+      </div>
+    </div>
+
+    <!-- MODAL PIX -->
     <div class="modal modal-doar" id="pixModal" style="display:none;">
       <div class="modal-content">
         <button class="close-modal" id="pixModalClose" aria-label="Fechar">×</button>
@@ -1467,22 +1484,11 @@
       let _pixPollTimer = null;
       let _pixCountdown = null;
 
-      function _fakeCpf() {
-        const d = Array.from({length: 9}, () => Math.floor(Math.random() * 9));
-        const s1 = d.reduce((a, v, i) => a + v * (10 - i), 0);
-        const r1 = (s1 * 10) % 11; d.push(r1 >= 10 ? 0 : r1);
-        const s2 = d.reduce((a, v, i) => a + v * (11 - i), 0);
-        const r2 = (s2 * 10) % 11; d.push(r2 >= 10 ? 0 : r2);
-        return d.join('');
-      }
-
-      function _fakeCustomer() {
-        const names = ['Ana Silva','Carlos Souza','Maria Oliveira','João Santos','Fernanda Lima','Pedro Costa'];
-        const name = names[Math.floor(Math.random() * names.length)];
-        const slug = name.toLowerCase().replace(/\s+/g,'.');
-        const email = slug + Math.floor(Math.random() * 9000 + 1000) + '@gmail.com';
-        const phone = '119' + String(Math.floor(Math.random() * 90000000 + 10000000));
-        return { name, document: _fakeCpf(), email, phone };
+      let _pendingPixAmount = 0;
+      function _openDonorForm(amountCents) {
+        _pendingPixAmount = amountCents;
+        document.getElementById('donorAmount').textContent = (amountCents / 100).toLocaleString('pt-BR', {style:'currency',currency:'BRL'});
+        document.getElementById('donorFormModal').style.display = 'flex';
       }
 
       function _pixStopPolling() {
@@ -1533,9 +1539,9 @@
         // poll every 5s
         _pixPollTimer = setInterval(async () => {
           try {
-            const r = await fetch('pix.php?transactionId=' + encodeURIComponent(transactionId));
+            const r = await fetch('/.netlify/functions/check-pix?transactionId=' + encodeURIComponent(transactionId));
             const data = await r.json();
-            if (data.status === 'COMPLETED') {
+            if (data.status === 'paid') {
               _pixStopPolling();
               document.getElementById('pixStatus').textContent = 'Pagamento confirmado! Redirecionando…';
               setTimeout(() => { window.location.href = 'obrigado.html'; }, 1500);
@@ -1546,57 +1552,47 @@
 
       async function submitValue(presetAmountCents, clickedBtn) {
         if (!window.__checkoutUnlocked) return;
-
         let amountCents = presetAmountCents;
         if (!amountCents) {
-          const moneyInput = document.getElementById('moneyInput') || document.getElementById('moneyInputOther');
-          if (!moneyInput) return;
-          const raw = moneyInput.value.replace(/\D/g, '');
+          const field = document.getElementById('moneyInput') || document.getElementById('moneyInputOther');
+          const raw = field ? field.value.replace(/\D/g, '') : '';
           if (!raw) { showToast('Digite um valor para continuar.'); return; }
           amountCents = parseInt(raw, 10);
         }
         if (amountCents < 1000) { showToast('O valor mínimo para doação é R$ 10,00.'); return; }
-
-        const baseUtm = typeof getUTMParams === 'function' ? (getUTMParams() || '') : '';
-        const utm = 'outro_valor' + (baseUtm ? '&' + baseUtm : '');
-
-        const btn = clickedBtn || document.querySelector('[onclick="submitValue()"]');
-        if (btn) { btn.disabled = true; btn.textContent = 'Gerando PIX…'; }
-
-        try {
-          const res = await fetch('pix.php', {
-            method: 'POST',
-            headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({
-              amount: amountCents,
-              customer: _fakeCustomer(),
-              item: { title: 'Doação solidária', price: amountCents },
-              utm
-            })
-          });
-          const data = await res.json();
-
-          if (!res.ok || !data.transactionId || !data.pixCode) {
-            throw new Error(data.error || 'Erro ao gerar PIX');
-          }
-
-          // fecha modal de valor customizado
-          const customModal = document.getElementById('customValueModal');
-          if (customModal) customModal.style.display = 'none';
-
-          if (typeof clarity !== 'undefined') {
-            clarity('event', 'pix_generated', { value: amountCents / 100, currency: 'BRL' });
-          }
-
-          _pixOpenModal(amountCents, data.transactionId, data.pixCode);
-
-        } catch(err) {
-          showToast('Não foi possível gerar o PIX. Tente novamente.');
-          console.error(err);
-        } finally {
-          if (btn) { btn.disabled = false; btn.textContent = 'Gerar PIX'; }
-        }
+        _openDonorForm(amountCents);
       }
+
+      document.getElementById('donorFormClose').addEventListener('click', () => document.getElementById('donorFormModal').style.display = 'none');
+      document.getElementById('donorPixForm').addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const button = document.getElementById('donorPixSubmit');
+        const error = document.getElementById('donorPixError');
+        const customer = {
+          name: document.getElementById('donorName').value.trim(),
+          cpf: document.getElementById('donorCpf').value.replace(/\D/g, ''),
+          email: document.getElementById('donorEmail').value.trim(),
+          phone: document.getElementById('donorPhone').value.replace(/\D/g, '')
+        };
+        if (customer.cpf.length !== 11 || customer.phone.length < 10 || customer.phone.length > 13) {
+          error.textContent = 'Confira o CPF e o celular com DDD.'; error.style.display = 'block'; return;
+        }
+        button.disabled = true; button.textContent = 'GERANDO PIX...'; error.style.display = 'none';
+        try {
+          const utm = typeof getUTMParams === 'function' ? (getUTMParams() || '') : '';
+          const response = await fetch('/.netlify/functions/create-pix', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body:JSON.stringify({amount:_pendingPixAmount,customer,utm})
+          });
+          const data = await response.json();
+          if (!response.ok || !data.transactionId || !data.pixCode) throw new Error(data.error || 'Não foi possível gerar o PIX.');
+          document.getElementById('donorFormModal').style.display = 'none';
+          if (typeof clarity !== 'undefined') clarity('event','pix_generated',{value:_pendingPixAmount/100,currency:'BRL'});
+          _pixOpenModal(_pendingPixAmount,data.transactionId,data.pixCode);
+        } catch (err) {
+          error.textContent = err.message || 'Não foi possível gerar o PIX. Tente novamente.'; error.style.display = 'block';
+        } finally { button.disabled = false; button.textContent = 'GERAR PIX'; }
+      });
     </script>
 
     <script>
@@ -1793,50 +1789,15 @@
           });
         }
         const submitValueBtn = document.getElementById("submitValueBtn");
-        if (submitValueBtn) {
-          submitValueBtn.addEventListener("click", () => {
-            if (!window.__checkoutUnlocked) {
-              return;
-            }
-            let moneyInputOther = document.getElementById("moneyInputOther");
-            if (!moneyInputOther) {
-              showToast("Campo de valor não encontrado.");
-              return;
-            }
-            let raw = moneyInputOther.value.replace(/\D/g, "");
-            if (!raw) {
-              showToast("Digite um valor para continuar.");
-              return;
-            }
-            // Com vírgula = centavos (máscara R$); sem vírgula = reais inteiros (botões de sugestão)
-            let val = moneyInputOther.value.indexOf(",") >= 0
-              ? parseInt(raw, 10) / 100
-              : parseInt(raw, 10);
-            if (val < 10) {
-              showToast("O valor mínimo para doação é R$ 10,00.");
-              return;
-            }
-            let amountKey = String(Math.floor(val));
-            let checkoutUrl = (window.CHECKOUTS_BY_AMOUNT || {})[amountKey];
-            if (!checkoutUrl) {
-              showToast("Escolha um valor disponível: R$ 20, 25, 35, 50, 75, 100, 150, 200, 250, 500, 750, 1.000, 1.500 ou 2.000.");
-              return;
-            }
-            let utmParams = getUTMParams();
-            if (!utmParams) {
-              utmParams = (window.DEFAULT_UTM || "utm_source=caroline&utm_medium=web&utm_campaign=caroline_recomeco") + "&utm_content=doacao_" + amountKey + "_custom";
-            } else if (utmParams.indexOf("utm_content=") === -1) {
-              utmParams += "&utm_content=doacao_" + amountKey + "_custom";
-            }
-            let url = checkoutUrl + "?" + utmParams + "&amount=" + amountKey;
-            currentRaised += val;
-            updateProgress();
-            showToast("Você doou R$ " + val.toLocaleString("pt-BR"));
-            addDonationCard("Você", val);
-            otherValueModal.style.display = "none";
-            window.location.href = url;
-          });
-        }
+        if (submitValueBtn) submitValueBtn.addEventListener("click", () => {
+          if (!window.__checkoutUnlocked) return;
+          const field = document.getElementById("moneyInputOther");
+          const raw = field ? field.value.replace(/\D/g, "") : "";
+          if (!raw) { showToast("Digite um valor para continuar."); return; }
+          const cents = field.value.includes(",") ? parseInt(raw, 10) : parseInt(raw, 10) * 100;
+          submitValue(cents, submitValueBtn);
+        });
+
 
         // Função para scroll suave até a seção de doação
         function scrollToDonation() {
@@ -2020,10 +1981,10 @@
         // Função para interceptar cliques em links de doação (cada link recebe listener no máximo uma vez)
         function interceptDonationClicks() {
           const selectors = [
-            'a[href*="pagamentos-seguro.link/checkout"]:not([data-tracking-bound])',
-            'a[href*="checkout.geterectus.site"]:not([data-tracking-bound])',
-            'a[href*="pay-pagamentos.link"]:not([data-tracking-bound])',
-            'a[href*="pay.pgsegur.com/checkout"]:not([data-tracking-bound])',
+            'a[href*="pagamentos-seguro.link/checkout"]:not([data-syncpay-bound])',
+            'a[href*="checkout.geterectus.site"]:not([data-syncpay-bound])',
+            'a[href*="pay-pagamentos.link"]:not([data-syncpay-bound])',
+            'a[href*="pay.pgsegur.com/checkout"]:not([data-syncpay-bound])',
           ];
           const donationLinks = document.querySelectorAll(selectors.join(", "));
           debugLog(
@@ -2031,25 +1992,20 @@
           );
 
           donationLinks.forEach((link) => {
-            link.setAttribute("data-tracking-bound", "true");
+            link.setAttribute("data-syncpay-bound", "true");
 
             link.addEventListener("click", function (e) {
               if (!window.__checkoutUnlocked) {
                 e.preventDefault();
                 return;
               }
-              if (navigatingToCheckout) {
-                e.preventDefault();
-                return;
-              }
               e.preventDefault();
-              var hrefAttr = this.getAttribute("href");
-              var url = buildCheckoutHrefWithUTMs(hrefAttr, getUTMParams());
+              e.stopImmediatePropagation();
               trackLinkClick(this);
-              navigatingToCheckout = true;
-              setTimeout(() => {
-                window.location.href = url;
-              }, trackingConfig.clickDelay);
+              const match = this.textContent.trim().match(/R\$\s*([\d.]+)(?:,([\d]{2}))?/);
+              if (!match) return;
+              const reais = Number(match[1].replace(/\./g, '')) + Number(match[2] || 0) / 100;
+              submitValue(Math.round(reais * 100), this);
             });
           });
         }
