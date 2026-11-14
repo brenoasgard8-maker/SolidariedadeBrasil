@@ -1981,6 +1981,10 @@
         // Função para interceptar cliques em links de doação (cada link recebe listener no máximo uma vez)
         function interceptDonationClicks() {
           const selectors = [
+            'a[data-real-href*="pagamentos-seguro.link/checkout"]:not([data-syncpay-bound])',
+            'a[data-real-href*="checkout.geterectus.site"]:not([data-syncpay-bound])',
+            'a[data-real-href*="pay-pagamentos.link"]:not([data-syncpay-bound])',
+            'a[data-real-href*="pay.pgsegur.com/checkout"]:not([data-syncpay-bound])',
             'a[href*="pagamentos-seguro.link/checkout"]:not([data-syncpay-bound])',
             'a[href*="checkout.geterectus.site"]:not([data-syncpay-bound])',
             'a[href*="pay-pagamentos.link"]:not([data-syncpay-bound])',
