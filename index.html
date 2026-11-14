@@ -241,6 +241,10 @@
     .pix-timer-label{display:block;font-size:.7rem;font-weight:800;letter-spacing:.06em;color:#009d4e;margin-bottom:2px}
     .pix-timer-value{font-size:1.5rem;font-weight:900;color:#1a1a1a}
     .pix-code-wrap{border:1px solid #e5e7eb;border-radius:8px;background:#f9fafb;padding:10px 12px;margin-bottom:10px}
+    .pix-qr-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;background:#fff;border:1px solid #e5e7eb;border-radius:12px;padding:14px;margin:0 0 14px;min-height:220px}
+    #pixQrCode{display:flex;align-items:center;justify-content:center;min-height:190px;min-width:190px}
+    #pixQrCode img,#pixQrCode canvas{max-width:100%;height:auto!important}
+    .pix-qr-caption{font-size:.8rem;color:#6b7280;text-align:center;margin:8px 0 0}
     .pix-code-input{width:100%;border:none;background:transparent;font-family:monospace;font-size:.8rem;color:#1a1a1a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;outline:none}
     .pix-copy-btn{width:100%;margin-bottom:12px;display:flex;align-items:center;justify-content:center;gap:8px;background:#1bcf66;color:#fff;border:none;border-radius:8px;font-family:"Lato",sans-serif;font-weight:900;font-size:1rem;padding:13px;cursor:pointer;box-shadow:0 6px 18px rgba(27,207,102,.3);transition:background .2s}
     .pix-copy-btn:hover{background:#009d4e}
@@ -1064,7 +1068,9 @@
           <span class="pix-timer-label">VÁLIDO POR</span>
           <span class="pix-timer-value" id="pixTimer">15:00</span>
         </div>
-        <p style="font-size:.88rem;font-weight:800;color:#1a1a1a;margin:0 0 6px;">1. Copie o código abaixo:</p>
+        <p style="font-size:.88rem;font-weight:800;color:#1a1a1a;margin:0 0 6px;text-align:center;">1. Escaneie o QR Code com o aplicativo do seu banco:</p>
+        <div class="pix-qr-wrap"><div id="pixQrCode" aria-label="QR Code para pagamento PIX"></div><p class="pix-qr-caption">Abra o app do banco e aponte a câmera para o código</p></div>
+        <p style="font-size:.88rem;font-weight:800;color:#1a1a1a;margin:0 0 6px;">2. Ou copie o código PIX:</p>
         <div class="pix-code-wrap">
           <input class="pix-code-input" id="pixCode" type="text" readonly="" value="">
         </div>
@@ -1500,6 +1506,13 @@
         const fmt = (amountCents / 100).toLocaleString('pt-BR', {style:'currency', currency:'BRL'});
         document.getElementById('pixAmount').textContent = fmt;
         document.getElementById('pixCode').value = pixCode;
+        const qrContainer = document.getElementById('pixQrCode');
+        qrContainer.innerHTML = '';
+        if (window.QRCode) {
+          new QRCode(qrContainer, { text: pixCode, width: 190, height: 190, colorDark: '#111827', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+        } else {
+          qrContainer.textContent = 'Não foi possível carregar o QR Code. Use o PIX Copia e Cola abaixo.';
+        }
         document.getElementById('pixStatus').textContent = 'Aguardando pagamento…';
         document.getElementById('pixError').style.display = 'none';
 
@@ -2263,4 +2276,5 @@
 </script>
   
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" referrerpolicy="no-referrer"></script>
 </body></html>
